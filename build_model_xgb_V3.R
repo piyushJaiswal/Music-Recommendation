@@ -97,26 +97,27 @@ save(train, file = "../DERIVED/train_basic_features.Rdata")
 
 
 
-## Number of plays -----------------------------------------
-cols <- c("song_id", "artist_name")
-norm_cols = c("none", "num_tracks_artist")
-for(l in 1:length(cols)){
-  
-  c = cols[l]
-  n = norm_cols[l]
-  
-  if(n=="none"){
-    x_agg <- train[, list(num_plays = .N), by = c]
-  }else{
-    x_agg <- train[, list(num_plays = .N/unique(get(n))), by = c]
-  }
-  
-  setnames(x_agg, "num_plays", paste0("num_plays","_",c))
-  train = merge(train, x_agg, by = c)
-  rm(x_agg)
-  gc()
-  
-}
+## Song/Artist' Engagement---------------------------------
+s1 = get.CV.stat.v2(df = copy(train[,c("song_id"), with = F]), nfold = 1, var1 = c("song_id"), var2 = NULL, thr = NULL, func = NULL)
+s2 = get.CV.stat.v2(df = copy(train[,c("artist_name"), with = F]), nfold = 1, var1 = c("artist_name"), var2 = NULL, thr = NULL, func = NULL)
+setnames(s1, "m", "song_plays")
+setnames(s2, "m", "artist_plays")
+train <- merge(train, s1, by = "song_id", all.x = T)
+train <- merge(train, s2, by = "artist_name", all.x = T)
+rm(s1, s2)
+gc()
+
+
+
+## Members' Engagement---------------------------------
+m1 = get.CV.stat.v2(df = copy(train[,c("msno"), with = F]), nfold = 1, var1 = c("msno"), var2 = NULL, thr = NULL, func = NULL)
+m2 = get.CV.stat.v2(df = copy(train[,c("msno","artist_name"), with = F]), nfold = 1, var1 = c("msno","artist_name"), var2 = NULL, thr = NULL, func = NULL)
+setnames(m1, "m", "member_song_plays")
+setnames(m2, "m", "member_artist_plays")
+train <- merge(train, m1, by = "msno", all.x = T)
+train <- merge(train, m2, by = c("msno","artist_name"), all.x = T)
+rm(m1, m2)
+gc()
 
 
 
@@ -136,6 +137,7 @@ for(c in cols_fac){
   
 }
 train[, ID := NULL]
+
 
 
 if(!testing){
@@ -280,28 +282,27 @@ load("../DERIVED/train_basic_features.Rdata")
 
 
 
-## Number of plays -----------------------------------------
-cols <- c("song_id", "artist_name")
-norm_cols = c("none", "num_tracks_artist")
-for(l in 1:length(cols)){
-  
-  c = cols[l]
-  n = norm_cols[l]
-  
-  if(n=="none"){
-    df = rbind(train[,c,with=F], test[,c,with=F])
-    x_agg <- df[, list(num_plays = .N), by = c]
-  }else{
-    df = rbind(train[,c(c,n),with=F], test[,c(c,n),with=F])
-    x_agg <- df[, list(num_plays = .N/unique(get(n))), by = c]
-  }
-  
-  setnames(x_agg, "num_plays", paste0("num_plays","_",c))
-  test = merge(test, x_agg, by = c)
-  rm(x_agg)
-  gc()
-  
-}
+## Song/Artist' Engagement---------------------------------
+s1 = get.CV.stat.v2(df = rbind(copy(train[,c("song_id"), with = F]), copy(test[,c("song_id"), with = F])), nfold = 1, var1 = c("song_id"), var2 = NULL, thr = NULL, func = NULL)
+s2 = get.CV.stat.v2(df = rbind(copy(train[,c("artist_name"), with = F]), copy(test[,c("artist_name"), with = F])), nfold = 1, var1 = c("artist_name"), var2 = NULL, thr = NULL, func = NULL)
+setnames(s1, "m", "song_plays")
+setnames(s2, "m", "artist_plays")
+test <- merge(test, s1, by = "song_id", all.x = T)
+test <- merge(test, s2, by = "artist_name", all.x = T)
+rm(s1, s2)
+gc()
+
+
+
+## Members' Engagement---------------------------------
+m1 = get.CV.stat.v2(df = rbind(copy(train[,c("msno"), with = F]), copy(test[,c("msno"), with = F])), nfold = 1, var1 = c("msno"), var2 = NULL, thr = NULL, func = NULL)
+m2 = get.CV.stat.v2(df = rbind(copy(train[,c("msno","artist_name"), with = F]), copy(test[,c("msno","artist_name"), with = F])), nfold = 1, var1 = c("msno","artist_name"), var2 = NULL, thr = NULL, func = NULL)
+setnames(m1, "m", "member_song_plays")
+setnames(m2, "m", "member_artist_plays")
+test <- merge(test, m1, by = "msno", all.x = T)
+test <- merge(test, m2, by = c("msno","artist_name"), all.x = T)
+rm(m1, m2)
+gc()
 
 
 
