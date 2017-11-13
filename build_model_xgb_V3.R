@@ -100,11 +100,20 @@ save(train, file = "../DERIVED/train_basic_features.Rdata")
 ## Song/Artist' Engagement---------------------------------
 s1 = get.CV.stat.v2(df = copy(train[,c("song_id"), with = F]), nfold = 1, var1 = c("song_id"), var2 = NULL, thr = NULL, func = NULL)
 s2 = get.CV.stat.v2(df = copy(train[,c("artist_name"), with = F]), nfold = 1, var1 = c("artist_name"), var2 = NULL, thr = NULL, func = NULL)
+s3 = get.CV.stat.v2(df = copy(train[,c("lyricist"), with = F]), nfold = 1, var1 = c("lyricist"), var2 = NULL, thr = NULL, func = NULL)
+s4 = get.CV.stat.v2(df = copy(train[,c("composer"), with = F]), nfold = 1, var1 = c("composer"), var2 = NULL, thr = NULL, func = NULL)
+s5 = get.CV.stat.v2(df = copy(train[,c("genre_ids"), with = F]), nfold = 1, var1 = c("genre_ids"), var2 = NULL, thr = NULL, func = NULL)
 setnames(s1, "m", "song_plays")
 setnames(s2, "m", "artist_plays")
+setnames(s3, "m", "lyricist_plays")
+setnames(s4, "m", "composer_plays")
+setnames(s5, "m", "genre_ids_plays")
 train <- merge(train, s1, by = "song_id", all.x = T)
 train <- merge(train, s2, by = "artist_name", all.x = T)
-rm(s1, s2)
+train <- merge(train, s3, by = "lyricist", all.x = T)
+train <- merge(train, s4, by = "composer", all.x = T)
+train <- merge(train, s5, by = "genre_ids", all.x = T)
+rm(s1, s2, s3, s4, s5)
 gc()
 
 
@@ -112,16 +121,37 @@ gc()
 ## Members' Engagement---------------------------------
 m1 = get.CV.stat.v2(df = copy(train[,c("msno"), with = F]), nfold = 1, var1 = c("msno"), var2 = NULL, thr = NULL, func = NULL)
 m2 = get.CV.stat.v2(df = copy(train[,c("msno","artist_name"), with = F]), nfold = 1, var1 = c("msno","artist_name"), var2 = NULL, thr = NULL, func = NULL)
+m3 = get.CV.stat.v2(df = copy(train[,c("msno","source_type"), with = F]), nfold = 1, var1 = c("msno","source_type"), var2 = NULL, thr = NULL, func = NULL)
+m4 = get.CV.stat.v2(df = copy(train[,c("msno","song_length"), with = F]), nfold = 1, var1 = c("msno"), var2 = "song_length", thr = NULL, func = function(x) return(mean(x)))
 setnames(m1, "m", "member_song_plays")
 setnames(m2, "m", "member_artist_plays")
+setnames(m3, "m", "member_source_type_plays")
+setnames(m4, "m", "member_mean_song_length")
 train <- merge(train, m1, by = "msno", all.x = T)
 train <- merge(train, m2, by = c("msno","artist_name"), all.x = T)
-rm(m1, m2)
+train <- merge(train, m3, by = c("msno","source_type"), all.x = T)
+train <- merge(train, m4, by = c("msno"), all.x = T)
+train[, ratio_member_mean_song_length := song_length/member_mean_song_length]
+rm(m1, m2, m3, m4)
 gc()
 
 
 
-## CV statistc for categorical variables with too many levels ------------------------
+# ## Members' Replay Habits -------------------------------
+# train[, ID := 1:.N]
+# m1 = get.CV.stat.v2(df = copy(train[,c("ID","msno","target"), with = F]), nfold = 5, var1 = c("msno"), var2 = "target", thr = NULL, func = function(x) return(sum(x)))
+# m2 = get.CV.stat.v2(df = copy(train[,c("ID","msno","artist_name","target"), with = F]), nfold = 5, var1 = c("msno","artist_name"), var2 = "target", thr = NULL, func = function(x) return(sum(x)))
+# setnames(m1, "m", "member_replays")
+# setnames(m2, "m", "member_artist_replays")
+# train <- merge(train, m1, by = "ID", all.x = T)
+# train <- merge(train, m2, by = c("ID"), all.x = T)
+# train[, ID := NULL]
+# rm(m1, m2)
+# gc()
+
+
+
+## CV statistc of replay prob for categorical variables with too many levels ------------------------
 cols_fac <- c("song_id", "msno", "genre_ids", "artist_name", "composer", "lyricist")
 thresholds = c(30, 50, 30, 30, 30, 30)
 train[, ID := 1:.N]
@@ -264,7 +294,7 @@ gc()
 
 
 
-# Start scoring
+## Start scoring ----------------------------------
 test <- fread("../DATA/test.csv")
 load( "../DERIVED/songs.Rdata")
 load( "../DERIVED/members.Rdata")
@@ -285,11 +315,20 @@ load("../DERIVED/train_basic_features.Rdata")
 ## Song/Artist' Engagement---------------------------------
 s1 = get.CV.stat.v2(df = rbind(copy(train[,c("song_id"), with = F]), copy(test[,c("song_id"), with = F])), nfold = 1, var1 = c("song_id"), var2 = NULL, thr = NULL, func = NULL)
 s2 = get.CV.stat.v2(df = rbind(copy(train[,c("artist_name"), with = F]), copy(test[,c("artist_name"), with = F])), nfold = 1, var1 = c("artist_name"), var2 = NULL, thr = NULL, func = NULL)
+s3 = get.CV.stat.v2(df = rbind(copy(train[,c("lyricist"), with = F]), copy(test[,c("lyricist"), with = F])), nfold = 1, var1 = c("lyricist"), var2 = NULL, thr = NULL, func = NULL)
+s4 = get.CV.stat.v2(df = rbind(copy(train[,c("composer"), with = F]), copy(test[,c("composer"), with = F])), nfold = 1, var1 = c("composer"), var2 = NULL, thr = NULL, func = NULL)
+s5 = get.CV.stat.v2(df = rbind(copy(train[,c("genre_ids"), with = F]), copy(test[,c("genre_ids"), with = F])), nfold = 1, var1 = c("genre_ids"), var2 = NULL, thr = NULL, func = NULL)
 setnames(s1, "m", "song_plays")
 setnames(s2, "m", "artist_plays")
+setnames(s3, "m", "lyricist_plays")
+setnames(s4, "m", "composer_plays")
+setnames(s5, "m", "genre_ids_plays")
 test <- merge(test, s1, by = "song_id", all.x = T)
 test <- merge(test, s2, by = "artist_name", all.x = T)
-rm(s1, s2)
+test <- merge(test, s3, by = "lyricist", all.x = T)
+test <- merge(test, s4, by = "composer", all.x = T)
+test <- merge(test, s5, by = "genre_ids", all.x = T)
+rm(s1, s2, s3, s4, s5)
 gc()
 
 
@@ -297,12 +336,31 @@ gc()
 ## Members' Engagement---------------------------------
 m1 = get.CV.stat.v2(df = rbind(copy(train[,c("msno"), with = F]), copy(test[,c("msno"), with = F])), nfold = 1, var1 = c("msno"), var2 = NULL, thr = NULL, func = NULL)
 m2 = get.CV.stat.v2(df = rbind(copy(train[,c("msno","artist_name"), with = F]), copy(test[,c("msno","artist_name"), with = F])), nfold = 1, var1 = c("msno","artist_name"), var2 = NULL, thr = NULL, func = NULL)
+m3 = get.CV.stat.v2(df = rbind(copy(train[,c("msno","source_type"), with = F]), copy(test[,c("msno","source_type"), with = F])), nfold = 1, var1 = c("msno","source_type"), var2 = NULL, thr = NULL, func = NULL)
+m4 = get.CV.stat.v2(df = rbind(copy(train[,c("msno","song_length"), with = F]), copy(test[,c("msno","song_length"), with = F])), nfold = 1, var1 = c("msno"), var2 = "song_length", thr = NULL, func = function(x) return(mean(x)))
 setnames(m1, "m", "member_song_plays")
 setnames(m2, "m", "member_artist_plays")
+setnames(m3, "m", "member_source_type_plays")
+setnames(m4, "m", "member_mean_song_length")
 test <- merge(test, m1, by = "msno", all.x = T)
 test <- merge(test, m2, by = c("msno","artist_name"), all.x = T)
-rm(m1, m2)
+test <- merge(test, m3, by = c("msno","source_type"), all.x = T)
+test <- merge(test, m4, by = c("msno"), all.x = T)
+test[, ratio_member_mean_song_length := song_length/member_mean_song_length]
+rm(m1, m2, m3, m4)
 gc()
+
+
+
+# ## Members' Replay Habits -------------------------------
+# m1 = get.CV.stat.v2(df = copy(train[,c("msno","target"), with = F]), nfold = 1, var1 = c("msno"), var2 = "target", thr = NULL, func = function(x) return(sum(x)))
+# m2 = get.CV.stat.v2(df = copy(train[,c("msno","artist_name","target"), with = F]), nfold = 1, var1 = c("msno","artist_name"), var2 = "target", thr = NULL, func = function(x) return(sum(x)))
+# setnames(m1, "m", "member_replays")
+# setnames(m2, "m", "member_artist_replays")
+# test <- merge(test, m1, by = "msno", all.x = T)
+# test <- merge(test, m2, by = c("msno","artist_name"), all.x = T)
+# rm(m1, m2)
+# gc()
 
 
 
