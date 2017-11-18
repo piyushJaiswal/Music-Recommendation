@@ -40,7 +40,7 @@ get.CV.stat <- function(df, nfold, var, thr){
 
 
 
-get.CV.stat.v2 <- function(df, nfold, var1, var2, thr, func){
+get.CV.stat.v2 <- function(df, nfold, var1, var2, thr, func, return_count = T){
   
   
   if(nfold==1){
@@ -52,7 +52,10 @@ get.CV.stat.v2 <- function(df, nfold, var1, var2, thr, func){
       if(!is.null(thr)){
         x_agg <- subset(x_agg, n>=thr)
       }
-      x_agg[, n:= NULL]
+      if(!return_count){
+        x_agg[, n:= NULL]
+      }
+      
     }
     
     return (x_agg)
@@ -66,7 +69,7 @@ get.CV.stat.v2 <- function(df, nfold, var1, var2, thr, func){
     
     
     df_temp <- data.table()
-    for(k in 1:5){
+    for(k in 1:nfold){
       
       holdout <- df[kfold == k, ]
       df2 <- df[kfold != k, ]
@@ -78,7 +81,9 @@ get.CV.stat.v2 <- function(df, nfold, var1, var2, thr, func){
         if(!is.null(thr)){
           x_agg <- subset(x_agg, n>=thr)
         }
-        x_agg[, n:= NULL]
+        if(!return_count){
+          x_agg[, n:= NULL]
+        }
       }
       
       holdout <- merge(holdout, x_agg, by = var1, all.x = T)
@@ -87,8 +92,12 @@ get.CV.stat.v2 <- function(df, nfold, var1, var2, thr, func){
     }
     
     
+    if(!return_count){
+      df_temp <- df_temp[order(ID), c("ID","m"), with = F]
+    }else{
+      df_temp <- df_temp[order(ID), c("ID","m","n"), with = F]
+    }
     
-    df_temp <- df_temp[order(ID), c("ID","m"), with = F]
     return (df_temp)
     
   }
