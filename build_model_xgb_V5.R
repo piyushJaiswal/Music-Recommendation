@@ -8,7 +8,6 @@ library(data.table)
 library(xgboost)
 library(dplyr)
 library(stringdist)
-library(lightgbm)
 
 
 
@@ -37,13 +36,12 @@ if(from_scratch){
   members[, expiration_year := as.numeric(year(expiration_date))]
   members[, expiration_month := as.integer(month(expiration_date))]
   
-  members[bd<=0 | bd > 150, bd := NA]
+  members[bd<0 | bd > 150, bd := NA]
   members[, bd := as.numeric(bd)]
-  members[, bd_bin := as.character(cut(bd, breaks = c(0, 10, 20, 40, 60, 150), include.lowest = F))]
   members[, member_since := as.numeric(expiration_date - registration_init_time)]
   members[member_since <=0, member_since := NA]
   
-  members_cols = c("msno", "city", "bd", "bd_bin","gender", "registered_via", "registration_year", "registration_month", "expiration_year", "expiration_month", "member_since")
+  members_cols = c("msno", "city", "bd", "gender", "registered_via", "registration_year", "registration_month", "expiration_year", "expiration_month", "member_since")
   train <- merge(train, members[, members_cols, with = F], by = "msno", all.x = T)
   
   save(members, members_cols, file = "../DERIVED/members.Rdata")
@@ -135,13 +133,6 @@ if(from_scratch){
 
 
 
-train[, year_issued_bin := as.character(cut(year_issued, c(1900, 1950, 2000, 2005, 2006, 2007, 
-                                                           2008, 2009, 2010, 2011, 2012, 2013, 
-                                                           2014, 2015, 2016, 2017), 
-                                            include.lowest = T))]
-
-
-
 ## Song/Artist' Engagement---------------------------------
 s1 = get.CV.stat.v2(df = copy(train[,c("song_id"), with = F]), nfold = 1, var1 = c("song_id"), var2 = NULL, thr = NULL, func = NULL)
 s2 = get.CV.stat.v2(df = copy(train[,c("artist_name"), with = F]), nfold = 1, var1 = c("artist_name"), var2 = NULL, thr = NULL, func = NULL)
@@ -170,27 +161,23 @@ m2 = get.CV.stat.v2(df = copy(train[,c("msno","artist_name"), with = F]), nfold 
 m3 = get.CV.stat.v2(df = copy(train[,c("msno","source_type"), with = F]), nfold = 1, var1 = c("msno","source_type"), var2 = NULL, thr = NULL, func = NULL)
 m4 = get.CV.stat.v2(df = copy(train[,c("msno","language"), with = F]), nfold = 1, var1 = c("msno","language"), var2 = NULL, thr = NULL, func = NULL)
 m5 = get.CV.stat.v2(df = copy(train[,c("msno","song_length"), with = F]), nfold = 1, var1 = c("msno"), var2 = "song_length", thr = NULL, func = function(x) return(mean(x)), return_count = F)
-#m6 = get.CV.stat.v2(df = copy(train[,c("msno","artist_name"), with = F]), nfold = 1, var1 = c("msno"), var2 = "artist_name", thr = NULL, func = function(x) return(length(unique(x))), return_count = F)
 setnames(m1, "m", "member_song_plays")
 setnames(m2, "m", "member_artist_plays")
 setnames(m3, "m", "member_source_type_plays")
 setnames(m4, "m", "member_language_plays")
 setnames(m5, "m", "member_mean_song_length")
-#setnames(m6, "m", "member_unique_artists")
 train <- merge(train, m1, by = "msno", all.x = T)
 train <- merge(train, m2, by = c("msno","artist_name"), all.x = T)
 train <- merge(train, m3, by = c("msno","source_type"), all.x = T)
 train <- merge(train, m4, by = c("msno","language"), all.x = T)
 train <- merge(train, m5, by = c("msno"), all.x = T)
-#train <- merge(train, m6, by = c("msno"), all.x = T)
 train[, ratio_member_mean_song_length := song_length/member_mean_song_length]
-#train[, member_unique_artists := as.integer((member_unique_artists/member_song_plays)>=0.8)]
-rm(m1, m2, m3, m4, m5, m6)
+rm(m1, m2, m3, m4, m5)
 gc()
 
 
 
-## Members' Replay Habits -------------------------------
+# ## Members' Replay Habits -------------------------------
 train[, ID := 1:.N]
 m1 = get.CV.stat.v2(df = copy(train[,c("ID","msno","source_type","target"), with = F]), nfold = 5, var1 = c("msno","source_type"), var2 = "target", thr = 30, func = function(x) return(mean(x)), return_count = F)
 m2 = get.CV.stat.v2(df = copy(train[,c("ID","msno","artist_name","target"), with = F]), nfold = 5, var1 = c("msno","artist_name"), var2 = "target", thr = 30, func = function(x) return(mean(x)), return_count = F)
@@ -198,30 +185,22 @@ m3 = get.CV.stat.v2(df = copy(train[,c("ID","msno","genre_ids","target"), with =
 m4 = get.CV.stat.v2(df = copy(train[,c("ID","msno","language","target"), with = F]), nfold = 5, var1 = c("msno","language"), var2 = "target", thr = 30, func = function(x) return(mean(x)), return_count = F)
 m5 = get.CV.stat.v2(df = copy(train[,c("ID","msno","language","source_type","target"), with = F]), nfold = 5, var1 = c("msno","language","source_type"), var2 = "target", thr = 20, func = function(x) return(mean(x)), return_count = F)
 m6 = get.CV.stat.v2(df = copy(train[,c("ID","msno","language","source_system_tab","target"), with = F]), nfold = 5, var1 = c("msno","language","source_system_tab"), var2 = "target", thr = 20, func = function(x) return(mean(x)), return_count = F)
-m7 = get.CV.stat.v2(df = copy(train[,c("ID","bd_bin","artist_name","target"), with = F]), nfold = 5, var1 = c("bd_bin","artist_name"), var2 = "target", thr = 30, func = function(x) return(mean(x)), return_count = F)
-m8 = get.CV.stat.v2(df = copy(train[,c("ID","bd_bin","genre_ids","target"), with = F]), nfold = 5, var1 = c("bd_bin","genre_ids"), var2 = "target", thr = 30, func = function(x) return(mean(x)), return_count = F)
-m9 = get.CV.stat.v2(df = copy(train[,c("ID","msno","year_issued_bin","target"), with = F]), nfold = 5, var1 = c("msno","year_issued_bin"), var2 = "target", thr = 30, func = function(x) return(mean(x)), return_count = F)
 setnames(m1, "m", "member_source_type_replay_prob")
 setnames(m2, "m", "member_artist_replay_prob")
-setnames(m3, "m", "member_genre_ids_replay_prob")
-setnames(m4, "m", "member_language_replay_prob")
-setnames(m5, "m", "member_language_source_type_replay_prob")
-setnames(m6, "m", "member_language_source_system_tab_replay_prob")
-setnames(m7, "m", "age_group_artist_replay_prob")
-setnames(m8, "m", "age_group_genre_ids_replay_prob")
-setnames(m9, "m", "member_year_group_replay_prob")
+setnames(m3, "m", "member_genre_ids_prob")
+setnames(m4, "m", "member_language_prob")
+setnames(m5, "m", "member_language_source_type_prob")
+setnames(m6, "m", "member_language_source_system_tab_prob")
 train <- merge(train, m1, by = "ID", all.x = T)
 train <- merge(train, m2, by = c("ID"), all.x = T)
 train <- merge(train, m3, by = "ID", all.x = T)
 train <- merge(train, m4, by = c("ID"), all.x = T)
 train <- merge(train, m5, by = c("ID"), all.x = T)
 train <- merge(train, m6, by = c("ID"), all.x = T)
-train <- merge(train, m7, by = c("ID"), all.x = T)
-train <- merge(train, m8, by = c("ID"), all.x = T)
-train <- merge(train, m9, by = c("ID"), all.x = T)
 train[, ID := NULL]
-rm(m1, m2, m3, m4, m5, m6, m7, m8, m9)
+rm(m1, m2)
 gc()
+
 
 
 
@@ -246,8 +225,8 @@ train[, ID := NULL]
 
 if(!testing){
   #save(train, file = "../DERIVED/train.Rdata")
-  #write.csv(train, file = "../DERIVED/train.csv", row.names = F)
-
+  write.csv(train, file = "../DERIVED/train.csv", row.names = F)
+  
 }
 
 
@@ -309,38 +288,34 @@ for(c in cols_fac){
 
 
 
-x_train[is.na(x_train)] = -1
-x_test[is.na(x_test)] = -1
-
-
-
 ## prepare data for xgboost - xgb.Dmatrix for train and validation -------------------------------------------------------------------
-train.lg <- lgb.Dataset(as.matrix(x_train), label=y_train)
-test.lg <- lgb.Dataset(as.matrix(x_test),label=y_test)
-gc()
+train.xg <- xgb.DMatrix(as.matrix(x_train), label=y_train, missing=NA)
+test.xg <- xgb.DMatrix(as.matrix(x_test),label=y_test, missing=NA)
+invisible(gc())
 
 
 
 ## Model parameters -------------------------------------------------------------------
 log_time <- format(Sys.time(), "%Y%m%d_%H%M%S")
 if(testing){
-  fname_msgs = paste0("../LOGS/msgs_lgbm_exp_", log_time, ".txt")
+  fname_msgs = paste0("../LOGS/msgs_xgb_exp_", log_time, ".txt")
 }else{
-  fname_msgs = paste0("../LOGS/msgs_lgbm_", log_time, ".txt")
+  fname_msgs = paste0("../LOGS/msgs_xgb_", log_time, ".txt")
 }
 file_msgs <- file(fname_msgs, open="wt")
 sink(file_msgs, type="output")
-params <- list(max_bin = 256,
-               learning_rate = 0.08,
-               boosting_type = "gbdt",
-               objective = "binary",
-               metric = "auc",
-               bagging_fraction = 0.85,
-               bagging_freq = 1,
-               bagging_seed = 1,
-               feature_fraction = 0.95,
-               num_leaves = 108,
-               max_depth = 12)
+params <- list(
+  "objective"           = "binary:logistic",
+  "eval_metric"         = "auc",
+  "eta"                 = 0.01,
+  "max_depth"           = 10,
+  "min_child_weight"    = 500,
+  "gamma"               = 0.70,
+  "subsample"           = 0.76,
+  "colsample_bytree"    = 0.95,
+  "alpha"               = 2e-05,
+  "lambda"              = 10
+)
 print(params)
 print("\n")
 
@@ -349,27 +324,24 @@ print("\n")
 ## Train Model with xgb.cv for optimal nrounds and then with xgb.train-------------------------------------------------------------------
 Sys.time()
 set.seed(123)
-model_lgb <- lgb.train(data=train.lg, nrounds = 1001,
-                       params = params, verbose = 0,# missing = NA, 
-                       early_stopping_rounds = 200, 
-                       #eval_freq = 100, 
-                       record = F, 
-                       valids = list(test = test.lg, train = train.lg)
+model_xgb <- xgb.train(data=train.xg, nrounds = 2501,
+                       params = params, verbose = 1, missing = NA, 
+                       early.stop.round = 200, 
+                       maximize = T, print.every.n = 100,
+                       watchlist = list(validation1 = test.xg, validation2 = train.xg)
 )
 Sys.time()
-print(model_lgb$eval_train())
-print(model_lgb$eval_valid())
 sink(file = NULL, type = "output")
 closeAllConnections()
 
 
 
-importance <- lgb.importance(model_lgb, percentage = T)
+importance <- data.frame(xgb.importance(cols_select, model = model_xgb))
 
 
 
-save(importance, file = "../MODELS/model_lgb_imp_4.Rdata")
-lgb.save(model_lgb, file = "../MODELS/model_lgb_4.model")
+save(importance, file = "../MODELS/model_xgb_imp_2.Rdata")
+save(model_xgb, file = "../MODELS/model_xgb_2.Rdata")
 rm(x_train, x_test)
 gc()
 
@@ -390,17 +362,6 @@ gc()
 
 
 load("../DERIVED/train_basic_features.Rdata")
-
-
-
-train[, year_issued_bin := as.character(cut(year_issued, c(1900, 1950, 2000, 2005, 2006, 2007, 
-                                                           2008, 2009, 2010, 2011, 2012, 2013, 
-                                                           2014, 2015, 2016, 2017), 
-                                            include.lowest = T))]
-test[, year_issued_bin := as.character(cut(year_issued, c(1900, 1950, 2000, 2005, 2006, 2007, 
-                                                          2008, 2009, 2010, 2011, 2012, 2013, 
-                                                          2014, 2015, 2016, 2017), 
-                                            include.lowest = T))]
 
 
 
@@ -431,56 +392,44 @@ m2 = get.CV.stat.v2(df = rbind(copy(train[,c("msno","artist_name"), with = F]), 
 m3 = get.CV.stat.v2(df = rbind(copy(train[,c("msno","source_type"), with = F]), copy(test[,c("msno","source_type"), with = F])), nfold = 1, var1 = c("msno","source_type"), var2 = NULL, thr = NULL, func = NULL)
 m4 = get.CV.stat.v2(df = rbind(copy(train[,c("msno","language"), with = F]), copy(test[,c("msno","language"), with = F])), nfold = 1, var1 = c("msno","language"), var2 = NULL, thr = NULL, func = NULL)
 m5 = get.CV.stat.v2(df = rbind(copy(train[,c("msno","song_length"), with = F]), copy(test[,c("msno","song_length"), with = F])), nfold = 1, var1 = c("msno"), var2 = "song_length", thr = NULL, func = function(x) return(mean(x)), return_count = F)
-#m6 = get.CV.stat.v2(df = rbind(copy(train[,c("msno","artist_name"), with = F]), copy(test[,c("msno","artist_name"), with = F])), nfold = 1, var1 = c("msno"), var2 = "artist_name", thr = NULL, func = function(x) return(length(unique(x))), return_count = F)
 setnames(m1, "m", "member_song_plays")
 setnames(m2, "m", "member_artist_plays")
 setnames(m3, "m", "member_source_type_plays")
 setnames(m4, "m", "member_language_plays")
 setnames(m5, "m", "member_mean_song_length")
-#setnames(m6, "m", "member_unique_artists")
 test <- merge(test, m1, by = "msno", all.x = T)
 test <- merge(test, m2, by = c("msno","artist_name"), all.x = T)
 test <- merge(test, m3, by = c("msno","source_type"), all.x = T)
 test <- merge(test, m4, by = c("msno","language"), all.x = T)
 test <- merge(test, m5, by = c("msno"), all.x = T)
-#test <- merge(test, m6, by = c("msno"), all.x = T)
 test[, ratio_member_mean_song_length := song_length/member_mean_song_length]
-#test[, member_unique_artists := as.integer((member_unique_artists/member_song_plays)>=0.8)]
 rm(m1, m2, m3, m4, m5)
 gc()
 
 
 
-## Members' Replay Habits -------------------------------
+# ## Members' Replay Habits -------------------------------
 m1 = get.CV.stat.v2(df = copy(train[,c("msno","source_type","target"), with = F]), nfold = 1, var1 = c("msno","source_type"), var2 = "target", thr = 50, func = function(x) return(mean(x)), return_count = F)
 m2 = get.CV.stat.v2(df = copy(train[,c("msno","artist_name","target"), with = F]), nfold = 1, var1 = c("msno","artist_name"), var2 = "target", thr = 50, func = function(x) return(mean(x)), return_count = F)
 m3 = get.CV.stat.v2(df = copy(train[,c("msno","genre_ids","target"), with = F]), nfold = 1, var1 = c("msno","genre_ids"), var2 = "target", thr = 50, func = function(x) return(mean(x)), return_count = F)
 m4 = get.CV.stat.v2(df = copy(train[,c("msno","language","target"), with = F]), nfold = 1, var1 = c("msno","language"), var2 = "target", thr = 50, func = function(x) return(mean(x)), return_count = F)
 m5 = get.CV.stat.v2(df = copy(train[,c("msno","language","source_type","target"), with = F]), nfold = 1, var1 = c("msno","language","source_type"), var2 = "target", thr = 50, func = function(x) return(mean(x)), return_count = F)
 m6 = get.CV.stat.v2(df = copy(train[,c("msno","language","source_system_tab","target"), with = F]), nfold = 1, var1 = c("msno","language","source_system_tab"), var2 = "target", thr = 50, func = function(x) return(mean(x)), return_count = F)
-m7 = get.CV.stat.v2(df = copy(train[,c("bd_bin","artist_name","target"), with = F]), nfold = 1, var1 = c("bd_bin","artist_name"), var2 = "target", thr = 50, func = function(x) return(mean(x)), return_count = F)
-m8 = get.CV.stat.v2(df = copy(train[,c("bd_bin","genre_ids","target"), with = F]), nfold = 1, var1 = c("bd_bin","genre_ids"), var2 = "target", thr = 50, func = function(x) return(mean(x)), return_count = F)
-m9 = get.CV.stat.v2(df = copy(train[,c("msno","year_issued_bin","target"), with = F]), nfold = 1, var1 = c("msno","year_issued_bin"), var2 = "target", thr = 50, func = function(x) return(mean(x)), return_count = F)
 setnames(m1, "m", "member_source_type_replay_prob")
 setnames(m2, "m", "member_artist_replay_prob")
-setnames(m3, "m", "member_genre_ids_replay_prob")
-setnames(m4, "m", "member_language_replay_prob")
-setnames(m5, "m", "member_language_source_type_replay_prob")
-setnames(m6, "m", "member_language_source_system_tab_replay_prob")
-setnames(m7, "m", "age_group_artist_replay_prob")
-setnames(m8, "m", "age_group_genre_ids_replay_prob")
-setnames(m9, "m", "member_year_group_replay_prob")
+setnames(m3, "m", "member_genre_ids_prob")
+setnames(m4, "m", "member_language_prob")
+setnames(m5, "m", "member_language_source_type_prob")
+setnames(m6, "m", "member_language_source_system_tab_prob")
 test <- merge(test, m1, by = c("msno","source_type"), all.x = T)
 test <- merge(test, m2, by = c("msno","artist_name"), all.x = T)
 test <- merge(test, m3, by = c("msno","genre_ids"), all.x = T)
 test <- merge(test, m4, by = c("msno","language"), all.x = T)
 test <- merge(test, m5, by = c("msno","language","source_type"), all.x = T)
 test <- merge(test, m6, by = c("msno","language","source_system_tab"), all.x = T)
-test <- merge(test, m7, by = c("bd_bin","artist_name"), all.x = T)
-test <- merge(test, m8, by = c("bd_bin","genre_ids"), all.x = T)
-test <- merge(test, m9, by = c("msno","year_issued_bin"), all.x = T)
-rm(m1, m2, m3, m4, m5, m6, m7, m8, m9)
+rm(m1, m2, m3, m4, m5, m6)
 gc()
+
 
 
 
@@ -495,6 +444,12 @@ for(c in cols_fac){
   test <- merge(test, x, by = c, all.x = T)
   test[, (c) := NULL]
   setnames(test, "m", c)
+  # if(c=="msno"){
+  #   setnames(test, "n", paste0(c,"_replays"))
+  # }else{
+  #   test[, n := NULL]
+  # }
+  # 
   rm(x)
   gc()
   
@@ -529,24 +484,26 @@ for(c in cols_fac){
 
 
 
-x_score[is.na(x_score)] = -1
+## prepare data for xgboost - xgb.Dmatrix ------------------------------------------------------
+score.xg <- xgb.DMatrix(as.matrix(x_score), missing = NA)
+gc()
 
 
 
 ## Score data-------------------------------------------------------------------
 Sys.time()
-preds_score = predict(model_lgb, as.matrix(x_score))
+preds_score = predict(model_xgb, score.xg, ntreelimit = 2500, missing = NA)
 test[, target := preds_score]
 Sys.time()
 
 
 
-# make submission
+## make submission -----------------------------------------------------
 submission <- fread("../DATA/sample_submission.csv")
 submission[, target := NULL]
 submission <- merge(submission, test[,c("id", "target"), with = F], by = "id", all.x = T)
 
-write.csv(submission, file = "../SUBMISSION/submission_17_lightgbm.csv", row.names = F)
+write.csv(submission, file = "../SUBMISSION/submission_14_xgb.csv", row.names = F)
 
 
 
